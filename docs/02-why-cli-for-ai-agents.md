@@ -1,70 +1,73 @@
-# 02. 왜 CLI인가, 왜 AI 에이전트인가
+# 02. Why a CLI, why an AI agent
 
-## 왜 CLI인가
+## Why a CLI
 
-웹 API를 에이전트에게 직접 주는 대신 CLI를 한 겹 두는 이유:
+Reasons to put a CLI layer in front instead of handing the web API straight to the agent:
 
-### 1) 텍스트 입출력 — 파싱이 결정론적
+### 1) Text in / text out — deterministic parsing
 
-`plane-cli-requiem`은 `--format json`(과 `csv`)을 지원합니다. 에이전트는 HTML을 긁거나
-화면을 추론할 필요 없이, **구조화된 출력을 그대로 파싱**합니다.
+`plane-cli-requiem` supports `--format json` (and `csv`). The agent doesn't scrape HTML or guess
+at a screen — it **parses structured output directly**.
 
 ```bash
 plane mine items --format json
 # → [{ "id": "...", "name": "...", "state": "In Progress", ... }, ...]
 ```
 
-### 2) 조합성(composability) — 작은 명령을 파이프로 엮기
+### 2) Composability — pipe small commands together
 
-유닉스 철학 그대로입니다. CLI 출력은 `jq`, `grep`, `sort`로 가공할 수 있어,
-큰 작업을 작은 명령의 조합으로 표현합니다.
+This is the Unix philosophy. CLI output can be shaped with `jq`, `grep`, `sort`, so a big task
+becomes a composition of small commands.
 
 ```bash
 plane mine items --format json | jq '[.[] | select(.state != "Done")] | length'
-# → 내 미완료 이슈 개수
+# → count of my open issues
 ```
 
-### 3) 결정론(determinism) — 같은 입력, 같은 동작
+### 3) Determinism — same input, same behavior
 
-CLI는 인자가 곧 동작입니다. 같은 명령은 같은 일을 합니다. UI 레이아웃 변경이나
-화면 추론에 흔들리지 않아, **에이전트 동작을 재현·테스트**하기 쉽습니다.
+For a CLI, the arguments *are* the behavior. The same command does the same thing. It isn't
+shaken by UI layout changes or screen inference, so agent behavior is **easy to reproduce and
+test**.
 
-### 4) 종료 코드 — 성공/실패를 프로그래밍
+### 4) Exit codes — program success/failure
 
-명령은 성공 시 `0`, 실패 시 비-0을 반환합니다. 에이전트 루프에서
-재시도·중단·분기를 깔끔하게 설계할 수 있습니다.
+A command returns `0` on success and non-zero on failure. That lets you design retries, aborts,
+and branching cleanly in an agent loop.
 
 ```bash
-if plane create "결제 모듈 리팩터링" --project X ; then
-  echo "생성 성공"
+if plane create "Refactor the payments module" --project X ; then
+  echo "created"
 else
-  echo "실패 — 토큰/권한 확인" >&2
+  echo "failed — check token/permissions" >&2
 fi
 ```
 
-### 5) 스크립트화 + 가드레일 — 권한을 좁히기 좋다
+### 5) Scriptable + guardrails — easy to scope permissions
 
-CLI를 통하면 "이 에이전트는 `plane issue list`와 `plane mine`만 쓸 수 있다" 같은
-**허용 명령 화이트리스트**를 한곳에서 강제할 수 있습니다. REST를 직접 주면
-이 경계를 매번 다시 그려야 합니다. (가드레일은 [04 문서](04-ai-agent-integration.md#가드레일).)
+Through a CLI you can enforce, in one place, an **allowed-command whitelist** like "this agent
+may only use `plane issue list` and `plane mine`." Hand over raw REST and you have to redraw that
+boundary every time. (Guardrails: [doc 04](04-ai-agent-integration.md#guardrails).)
 
-## 왜 AI 에이전트인가
+## Why an AI agent
 
-CLI가 준비되면, 그 위에 에이전트를 얹는 것이 자연스러운 다음 단계입니다.
+Once the CLI is ready, putting an agent on top of it is the natural next step.
 
-- **반복·정형 작업의 위임**: 매일 스탠드업 요약, 오래된 이슈 트리아지, 라벨 정리 등.
-- **자연어 → 구조화 작업**: "회의록에서 액션 아이템 뽑아 이슈로 만들어줘"처럼,
-  비정형 텍스트를 받아 정형 CLI 명령으로 변환하는 일은 LLM이 잘합니다.
-- **맥락 유지**: 에이전트는 여러 명령의 결과를 기억하며 다단계 작업을 수행합니다
-  ("미완료 이슈 조회 → 우선순위 판단 → 담당자에게 코멘트").
-- **사람은 검토에 집중**: 에이전트가 초안(이슈 생성, 상태 변경 제안)을 만들고,
-  사람은 승인/수정만 — 특히 **쓰기 작업은 사람 확인 후**가 안전합니다.
+- **Delegate repetitive, structured work**: daily standup summaries, triaging stale issues,
+  tidying labels.
+- **Natural language → structured action**: turning unstructured text into structured CLI
+  commands — "pull the action items from these meeting notes and make them issues" — is something
+  an LLM does well.
+- **Holds context**: the agent remembers results across several commands and performs multi-step
+  work ("list open issues → judge priority → comment to the assignee").
+- **Humans focus on review**: the agent drafts (creates issues, proposes state changes) and the
+  human only approves or edits — **write operations are safest behind a human check.**
 
-## 핵심 비유
+## The core analogy
 
-> REST API를 주는 것은 에이전트에게 **부품 상자**를 주는 것이고,
-> CLI를 주는 것은 **공구**를 주는 것이다.
-> 부품으로도 만들 수 있지만, 공구가 있으면 더 빠르고 안전하고 재현 가능하게 만든다.
+> Handing over the REST API is giving the agent a **box of parts**.
+> Handing over the CLI is giving it **power tools**.
+> You can build with parts, but tools make it faster, safer, and reproducible.
 
-다음: 자체 호스팅 인스턴스에 CLI를 붙이는 실제 절차 →
+Next: the actual steps to connect the CLI to a self-hosted instance →
 [03-self-hosting-setup.md](03-self-hosting-setup.md).

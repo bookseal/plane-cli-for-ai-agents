@@ -1,95 +1,104 @@
-# 04. AI 에이전트 통합
+# 04. AI agent integration
 
-목표: 사람이 쓰는 `plane` CLI를 **그대로 AI 에이전트의 도구**로 노출해서,
-에이전트가 이슈를 읽고/만들고/코멘트하게 만들기. 단, 안전하게.
+Goal: expose the same `plane` CLI a human uses **directly as a tool for an AI agent**, so the
+agent can read, create, and comment on issues — safely.
 
-## 두 가지 통합 경로
+## Two integration paths
 
-### A) CLI를 에이전트의 셸 도구로 노출 (가장 단순)
+### A) Expose the CLI as the agent's shell tool (simplest)
 
-대부분의 코딩 에이전트(예: Claude Code)는 셸 명령을 실행할 수 있습니다.
-`PLANE_API_URL`과 토큰이 설정된 환경이라면, 에이전트는 바로 이렇게 씁니다:
+Most coding agents (e.g. Claude Code) can run shell commands. In an environment where
+`PLANE_API_URL` and a token are set, the agent just uses it directly:
 
 ```bash
 plane mine items --format json
 plane ls --project <slug> --format json
-plane create "이슈 제목" --project <slug> --description "..."
-plane comment post <NRO-123> "코멘트 내용"
+plane create "Issue title" --project <slug> --description "..."
+plane comment post <NRO-123> "comment body"
 ```
 
-> 실제 명령 이름 (plane-cli-requiem v0.3.3 기준):
-> - 읽기: `plane ls`, `plane show <ID>`, `plane mine items`, `plane projects`, `plane me`, `plane comment ls <ID>`, `plane dashboard`
-> - 쓰기: `plane create <제목>`, `plane update <ID> --state ...`, `plane done <ID>`, `plane comment post <ID> "..."`, `plane bulk <ID...>`, `plane delete <ID>`
-> - 출력은 파이프로 넘기면 자동으로 JSON입니다(`--format json`은 명시해도 됨).
+> Real command names (plane-cli-requiem v0.3.3):
+> - Read: `plane ls`, `plane show <ID>`, `plane mine items`, `plane projects`, `plane me`,
+>   `plane comment ls <ID>`, `plane dashboard`
+> - Write: `plane create <title>`, `plane update <ID> --state ...`, `plane done <ID>`,
+>   `plane comment post <ID> "..."`, `plane bulk <ID...>`, `plane delete <ID>`
+> - Output is JSON automatically when piped (`--format json` may be stated explicitly).
 
-에이전트에게 시스템 프롬프트로 알려줄 것:
+What to tell the agent in the system prompt:
 
-- **항상 `--format json`을 붙여라** (결정론적 파싱).
-- **쓰기 명령(`create`/`update`/`delete`)은 실행 전에 사람 확인을 받아라.**
-- 허용된 하위 명령 목록(아래 화이트리스트)만 사용해라.
+- **Always add `--format json`** (deterministic parsing).
+- **Get human confirmation before write commands (`create`/`update`/`delete`).**
+- Use only the allowed subcommands (the whitelist below).
 
 ### B) MCP (Model Context Protocol)
 
-공식 **Plane MCP Server**를 쓰면, CLI 대신 구조화된 MCP 도구로 노출됩니다.
-스키마가 명시적이라 에이전트가 인자를 덜 틀립니다. CLI 경로와 병행/대체 가능합니다.
+With the official **Plane MCP Server**, Plane is exposed as structured MCP tools instead of the
+CLI. The schemas are explicit, so the agent gets arguments wrong less often. It can complement or
+replace the CLI path.
 
-- 장점: 도구 스키마·권한이 명시적, 출력이 구조화됨
-- 단점: 별도 서버 운영, 셸 조합성(파이프)은 약함
-- 선택 기준: **빠른 셸 자동화 → CLI**, **여러 에이전트/엄격한 스키마 → MCP**
+- Pros: tool schemas and permissions are explicit; output is structured
+- Cons: a separate server to run; weaker shell composability (pipes)
+- How to choose: **quick shell automation → CLI**, **many agents / strict schemas → MCP**
 
-또는 `plane-cli-requiem`을 감싸는 **얇은 MCP 래퍼**를 직접 만들어, 허용 명령만
-도구로 등록하는 방법도 있습니다 (CLI의 조합성 + MCP의 명시성).
+For using the Plane MCP from Claude Code specifically, see
+[07-claude-code-plane-mcp.md](07-claude-code-plane-mcp.md).
 
-## 가드레일
+You can also build a **thin MCP wrapper** around `plane-cli-requiem` yourself, registering only
+the allowed commands as tools (the composability of the CLI + the explicitness of MCP).
 
-에이전트가 Plane을 망가뜨리지 않게 하는 최소 장치들:
+## Guardrails
 
-### 1) 최소 권한 토큰 + 짧은 만료
+The minimum measures to keep an agent from breaking Plane:
 
-- 에이전트 전용 토큰을 사람 토큰과 **분리**하세요.
-- 가능하면 **읽기 우선**으로 시작 (조회/요약). 쓰기는 신뢰가 쌓인 뒤.
-- **만료를 짧게** 잡고 주기적으로 회전(rotate)하세요.
-- 토큰은 환경변수/시크릿 매니저로만 주입. **프롬프트·로그·커밋에 남기지 마세요.**
+### 1) Least-privilege token + short expiry
 
-### 2) 명령 화이트리스트
+- **Separate** the agent-only token from the human's token.
+- Start **read-first** where you can (query/summarize). Add writes once trust builds.
+- Set a **short expiry** and rotate periodically.
+- Inject the token only via env var / secrets manager. **Never leave it in a prompt, log, or
+  commit.**
 
-에이전트가 부를 수 있는 하위 명령을 명시적으로 제한합니다. 예:
+### 2) Command whitelist
 
-```
-허용 (읽기):  plane me, plane projects, plane ls, plane mine items, plane show
-허용 (쓰기):  plane comment post       # 코멘트는 비교적 안전
-금지:         plane delete --yes, plane bulk, 대량 update
-```
-
-읽기 전용 토큰을 쓰면 화이트리스트가 깨져도 서버 측에서 한 번 더 막힙니다 (이중 방어).
-
-### 3) 사람-확인 루프 (human-in-the-loop)
-
-쓰기 작업은 **제안 → 사람 승인 → 실행** 순서로. 에이전트는 실행할 명령을 출력만 하고,
-사람이 승인한 것만 셸로 넘기는 패턴이 안전합니다.
-
-### 4) 변경 추적
-
-에이전트가 만든/바꾼 이슈에는 일관된 라벨(예: `agent`)이나 코멘트 서명을 남겨,
-나중에 사람이 필터링·롤백할 수 있게 하세요.
-
-## 예시 에이전트 루프 (의사 코드)
-
-"매일 아침, 내 미완료 이슈를 요약하고, 3일 이상 안 움직인 이슈에 리마인더 코멘트 제안":
+Explicitly limit the subcommands the agent may call. For example:
 
 ```
-1. items = run("plane mine items --format json")        # 읽기
-2. stale = items에서 updated_at이 3일 이전인 것 필터       # LLM/jq
-3. summary = LLM이 stale을 사람이 읽을 요약으로 정리        # 추론
-4. 사용자에게 summary + 제안 코멘트 목록 제시               # human-in-the-loop
-5. 사용자가 승인한 항목만:
-     run("plane comment post <NRO-123> '리마인더: ...'")  # 쓰기 (승인 후)
+Allow (read):   plane me, plane projects, plane ls, plane mine items, plane show
+Allow (write):  plane comment post       # comments are relatively safe
+Deny:           plane delete --yes, plane bulk, bulk update
 ```
 
-읽기(1)는 자유롭게, 쓰기(5)는 승인 후에만 — 이 경계가 핵심입니다.
+If you use a read-only token, the server blocks again even if the whitelist is breached (defense
+in depth).
 
-## 실전 데모
+### 3) Human-in-the-loop
 
-내 작업 스탠드업 요약 스크립트:
+Run write operations as **propose → human approval → execute**. A safe pattern: the agent only
+prints the command it would run, and only what the human approves is passed to the shell.
+
+### 4) Change tracking
+
+Tag issues the agent creates or changes with a consistent label (e.g. `agent`) or a comment
+signature, so a human can filter and roll them back later.
+
+## Example agent loop (pseudocode)
+
+"Each morning, summarize my open issues and propose reminder comments on issues that haven't
+moved in 3+ days":
+
+```
+1. items = run("plane mine items --format json")        # read
+2. stale = filter items where updated_at is older than 3 days   # LLM/jq
+3. summary = LLM turns stale into a human-readable summary        # reasoning
+4. show the human the summary + list of proposed comments          # human-in-the-loop
+5. only for items the human approved:
+     run("plane comment post <NRO-123> 'Reminder: ...'")  # write (after approval)
+```
+
+Reads (1) are free; writes (5) only after approval — that boundary is the whole point.
+
+## Real demo
+
+The standup summary script for my work:
 [../examples/standup-summary.sh](../examples/standup-summary.sh).
-이 스크립트의 `jq` 파이프라인은 직접 채워보도록 `TODO(human)`으로 남겨두었습니다.
+Its `jq` pipeline is a good, compact example of shaping CLI JSON into a human-readable summary.
