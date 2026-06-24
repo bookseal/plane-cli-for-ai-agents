@@ -1,0 +1,21 @@
+# ── 토큰/시크릿 (절대 커밋 금지) ──
+.env
+.env.*
+*.token
+*.secret
+secrets.*
+
+# plane-cli-requiem 설정 파일 (토큰 포함될 수 있음)
+config.toml
+**/config.toml
+.config/
+
+# ── OS / 에디터 ──
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# ── Rust 빌드 산출물 (링크 패치 빌드 시) ──
+target/
+Cargo.lock
