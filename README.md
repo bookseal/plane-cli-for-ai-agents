@@ -90,6 +90,8 @@ plane projects    # 프로젝트 목록
    → [docs/04-ai-agent-integration.md](docs/04-ai-agent-integration.md)
 5. **데모** — 내 작업 스탠드업 요약
    → [examples/standup-summary.sh](examples/standup-summary.sh)
+6. **실전 walkthrough** — 설치부터 첫 쓰기까지, 실제로 겪은 함정 기록
+   → [docs/05-walkthrough.md](docs/05-walkthrough.md)
 
 ---
 
