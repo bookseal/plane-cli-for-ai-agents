@@ -72,10 +72,18 @@ plane config --workspace <slug> --token plane_api_xxx
 ## 5) 연결 확인
 
 ```bash
-plane me          # 내 사용자 정보(JSON) → 나오면 인증 성공
-plane projects    # 프로젝트 목록
+plane me          # 워크스페이스/인증 상태 → 나오면 성공
+plane projects    # 프로젝트 목록 (각 항목의 identifier가 --project 에 쓰는 값)
+plane ls --project <IDENTIFIER>   # 특정 프로젝트의 이슈
 plane mine items  # 내게 할당된 이슈
 ```
+
+> `plane mine` / `plane ls`가 "no default project" 오류를 내면, 기본 프로젝트를 한 번 지정하세요:
+> `plane config --project <IDENTIFIER>` (IDENTIFIER는 `plane projects` 출력의 대문자 식별자, 예: `AUTOPLAN`).
+>
+> 참고: 이 CLI의 이슈 JSON은 평평한 형태입니다 —
+> `{ "id": "AUTOPLAN-3", "title": ..., "state": "Backlog", "priority": "None", "due": null }`.
+> `state`/`priority`는 객체가 아니라 문자열이라, jq에서 `.state.name`이 아니라 `.state`로 접근합니다.
 
 `plane me`가 401/403이면 토큰/만료/권한을, 연결 오류면 `PLANE_API_URL`과
 도메인 접근성(브라우저로 열리는지)을 확인하세요.
