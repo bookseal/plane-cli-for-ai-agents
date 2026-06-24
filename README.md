@@ -92,6 +92,8 @@ plane projects    # 프로젝트 목록
    → [examples/standup-summary.sh](examples/standup-summary.sh)
 6. **실전 walkthrough** — 설치부터 첫 쓰기까지, 실제로 겪은 함정 기록
    → [docs/05-walkthrough.md](docs/05-walkthrough.md)
+7. **CLI 함정과 레시피** — 에이전트가 막히는 지점(사이클 생성 버그, 기능 토글, raw API 우회)과 검증된 명령
+   → [docs/06-cli-gotchas-and-recipes.md](docs/06-cli-gotchas-and-recipes.md)
 
 ---
 
