@@ -1,3 +1,10 @@
+> ⚠️ **Archived (June 2026).** This project explored driving self-hosted Plane from a CLI / AI agent.
+> After putting it head-to-head with **GitHub Projects** (`gh` CLI + Projects v2) on our real
+> meeting-notes → task reconcile workflow, we concluded GitHub Projects fit better for us
+> (zero hosting, work + code + issues in one place) and **migrated off Plane**. Kept public and
+> read-only as a record of the exploration and the decision. The live setup & writeup now live in
+> [`KIBA-Automation/project_management_with_ai_agent`](https://github.com/KIBA-Automation/project_management_with_ai_agent).
+
 # plane-cli-for-ai-agents
 
 A repo documenting how to **drive self-hosted [Plane](https://plane.so)** (the open-source
